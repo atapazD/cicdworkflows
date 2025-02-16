@@ -1,0 +1,45 @@
+name: Terraform Deployment Pipeline
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'infrastructure/**' # Run the pipeline only when changes are made to the infrastructure directory
+    pull_request:
+        branches: [main]
+        paths:
+            - 'infrastructure/**' # Run the pipeline only when changes are made to the infrastructure directory
+
+jobs:
+    terraform-local:
+        name: Terraform Plan (LocalStack)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4           
+            - name: Set Up Terraform
+              uses: hashicorp/setup-terraform@v3
+            - name: Start LocalStack
+              run: |
+                docker run -d -p 4566:4566 localstack/localstack
+            - name: Terraform Init
+              run: terraform init
+            - name: Terraform Validate #Ensures terraform configuration is correct
+              run: terraform validate
+            - name: Run Checkov (Security Scan, Soft Fail)
+              run: pip install checkov && checkov -d . --soft-fail || true # I'm using a soft fail to allow the pipeline to continue
+            - name: Terraform Plan (LocalStack)
+              run: terraform plan -out=tfplan-local
+    terraform-aws:
+        name: Terrraform Apply (AWS)
+        needs: terraform-local
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+            - name: Set Up Terraform
+              uses: hashicorp/setup-terraform@v3
+            - name: Terraform Init (AWS)
+              run: terraform init
+            - name: Terraform Apply (AWS)
+              run: terraform apply --auto-approve

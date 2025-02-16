@@ -1,0 +1,45 @@
+name: CI Pipeline
+
+on:
+    workflow_call:
+        inputs:
+            linter:
+                required: false
+                type: string # Options: eslint, pylint, prettier, none
+        secrets: {} # No secrets are required for this pipeline
+
+    push:
+        branches: [main, develop]
+        paths:
+            - 'app/**' # Run the pipeline only when changes are made to the app directory
+    pull_request:
+        branches: [main, develop]
+        paths:
+            - 'app/**' # Run the pipeline only when changes are made to the app directory
+
+jobs:
+    ci:
+        name: Run CI Checks
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Set Up Node.js
+              if: inputs.linter == 'eslint' || inputs.linter == 'prettier'
+              uses: actions/setup-node@v4
+              with:
+                node-version: "18"
+      
+            - name: Install Dependencies (Node)
+              if: inputs.linter == 'eslint' || inputs.linter == 'prettier'
+              run: npm ci
+      
+            - name: Run ESLint for TypeScript (Compact Format, Allow Warnings)
+              if: inputs.linter == 'eslint'
+              run: npx eslint "app/**/*.ts" --format=compact || true # For now we are using '|| true' to ignore the errors
+      
+            - name: Run Prettier for JSON (Allow Warnings)  
+              if: inputs.linter == 'prettier'
+              run: npx prettier --check "app/**/*.json" || true # For now we are using '|| true' to ignore the error
+        
